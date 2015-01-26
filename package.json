@@ -1,0 +1,44 @@
+{
+  "name": "ember-dev-fixtures",
+  "version": "0.0.0",
+  "description": "An improved Ember Data fixture adapter to be used on dev env, and which is not inserted as part of the app in prod builds.",
+  "directories": {
+    "doc": "doc",
+    "test": "tests"
+  },
+  "scripts": {
+    "start": "ember server",
+    "build": "ember build",
+    "test": "ember test"
+  },
+  "repository": "https://github.com/huafu/ember-dev-fixtures.git",
+  "engines": {
+    "node": ">= 0.10.0"
+  },
+  "author": "Huafu Gandon <huafu.gandon@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "broccoli-asset-rev": "^2.0.0",
+    "broccoli-ember-hbs-template-compiler": "^1.6.1",
+    "ember-cli": "0.1.9",
+    "ember-cli-6to5": "0.2.1",
+    "ember-cli-content-security-policy": "0.3.0",
+    "ember-cli-dependency-checker": "0.0.7",
+    "ember-cli-ic-ajax": "0.1.1",
+    "ember-cli-inject-live-reload": "^1.3.0",
+    "ember-cli-qunit": "0.1.2",
+    "ember-data": "1.0.0-beta.12",
+    "ember-export-application-global": "^1.0.0",
+    "express": "^4.8.5",
+    "glob": "^4.0.5"
+  },
+  "keywords": [
+    "ember-addon",
+    "fixtures",
+    "adapter",
+    "ember-data"
+  ],
+  "ember-addon": {
+    "configPath": "tests/dummy/config"
+  }
+}
