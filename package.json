@@ -1,6 +1,6 @@
 {
   "name": "ember-dev-fixtures",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "An improved Ember Data fixture adapter to be used on dev env, and which is not inserted as part of the app in prod builds.",
   "directories": {
     "doc": "doc",
