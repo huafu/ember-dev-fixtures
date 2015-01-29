@@ -13,3 +13,4 @@ testem.json
 
 tmp/
 dist/
+.idea/
