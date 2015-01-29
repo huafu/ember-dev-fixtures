@@ -9,13 +9,13 @@ and it'll just work with the fixtures if you activated them in the config).
 
 ## Why is it good to use this addon?
 
-- You can develop without needing a backend.
+- You can code your frontend without needing a backend.
 - You can create new features for your application while the API is yet not ready for it.
 - You can run unit/acceptance tests with many different situations thanks to fixture overlays.
 - You can deploy a demo-application which would not need anything else than a static content web
 server.
 - You can distribute zip files as demo-applications where the user would just open the `index.html`
-of the unpacked folder of the zip-file.
+of the unpacked folder of the zip-file and it would work straight away.
 
 
 ## Installation
