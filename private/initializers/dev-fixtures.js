@@ -1,42 +1,242 @@
+/* globals require */
 import Ember from 'ember';
 import ENV from '../config/environment';
 import DevFixturesAdapter from '../adapters/dev-fixtures';
 
-var ALL_FIXTURES = {};
-
-
-function overrideAdapter(name, extension, app) {
-  var path = ENV.modulePrefix + '/adapters/' + name, Class, hasModule, Module;
-  try {
-    Module = require(path);
-    hasModule = true;
+/**
+ * Get or create the overlay with given name in the given dictionary
+ *
+ * @function getOverlay
+ * @param {string} name
+ * @param {Object} dict
+ * @return {{name: string, options: {}, fixtures: {}}
+ */
+function getOverlay(name, dict) {
+  var overlay = dict[name];
+  if (!overlay) {
+    dict[name] = overlay = {name: name, options: {include: []}, fixtures: {}};
   }
-  catch (e) {
-    hasModule = false;
+  return overlay;
+}
+
+/**
+ * Coerce an ID
+ *
+ * @function coerceId
+ * @param {string|number} id
+ * @return {string}
+ */
+function coerceId(id) {
+  return '' + id;
+}
+
+/**
+ * Get the meta of a record for a given ID
+ *
+ * @function recordMetaForId
+ * @param {Ember.Array} records
+ * @param {string|number} id
+ * @return {{record: Object, index: number}}
+ */
+function recordMetaForId(records, id) {
+  var meta;
+  id = coerceId(id);
+  return records.find(function (record, index) {
+    if (coerceId(record.id) === id) {
+      meta = {record: record, index: index};
+      return true;
+    }
+    return false;
+  }) ? meta : null;
+}
+
+/**
+ * Overrides the fixtures with the given overlay name
+ *
+ * @function overrideFixturesWithOverlay
+ * @param {Object} FIXTURES
+ * @param {Object} OVERLAYS
+ * @param {Object} overlayName
+ * @param {string} source
+ * @return {Object}
+ */
+function overrideFixturesWithOverlay(FIXTURES, OVERLAYS, overlayName, source) {
+  var overlay, i, fixtures, existingFixtures;
+  if (overlayName) {
+    overlay = OVERLAYS[overlayName];
+    // undefined overlay
+    if (!overlay) {
+      throw new Error(
+        '[ember-dev-fixtures] Trying to import fixture overlay `' + overlayName +
+        '` for ' + source + ' but there is no such overlay.'
+      );
+    }
+    // be sure we are not re-including an already included overlay
+    if (overlay.injectedBy) {
+      Ember.warn(
+        '[ember-dev-fixtures] The overlay `' + overlayName + '` has already been included from ' +
+        overlay.injectedBy + '. The ' + source +
+        ' is trying to include it as well, but it won\'t be included again.'
+      );
+      return FIXTURES;
+    }
+    // first include over overlays
+    for (i = 0; i < overlay.options.include; i++) {
+      overrideFixturesWithOverlay(
+        FIXTURES, OVERLAYS, overlay.options.include[i], 'overlay `' + overlayName + '`'
+      );
+    }
+    // test again if we had already been injected
+    if (overlay.injectedBy) {
+      throw new Error('[ember-dev-fixtures] Circular overlay reference. The overlay `' + overlayName +
+      '` has been injected from ' + overlay.injectedBy + ' which is one of its own inclusion (`include`).');
+    }
+    // then include the given overlay
+    Ember.EnumerableUtils.forEach(Ember.keys(overlay.fixtures), function (modelName) {
+      fixtures = overlay.fixtures[modelName];
+      existingFixtures = FIXTURES[modelName];
+      // create the array if it does not exists for that model
+      if (!existingFixtures) {
+        FIXTURES[modelName] = existingFixtures = Ember.A([]);
+      }
+      // loop over all fixtures (records) for this model
+      Ember.EnumerableUtils.forEach(fixtures, function (record) {
+        var meta;
+        // try to find an existing record in the actual fixtures
+        meta = recordMetaForId(existingFixtures, record.id);
+        if (meta) {
+          // if we have an existing fixture
+          if (record.__removeFixture) {
+            // remove it if it has the flag
+            existingFixtures.splice(meta.index, 1);
+          }
+          else {
+            // else merge it
+            Ember.merge(meta.record, record);
+          }
+        }
+        else if (!record.__removeFixture) {
+          // no fixture yet, add it if it has not the delete flag
+          existingFixtures.pushObject(record);
+        }
+      });
+    });
+    // flag our overlay as included
+    overlay.injectedBy = source;
+  }
+  return FIXTURES;
+}
+
+/**
+ * Handle the import of an overlay fixture or overlay index
+ *
+ * @function handleOverlayImport
+ * @param {string} base
+ * @param {string} name
+ * @param {Object} dict
+ * @return {{name: string, options: {}, fixtures: {}}
+ */
+function handleOverlayImport(base, name, dict) {
+  var match, overlay, modelName, options;
+  if ((match = base.match(/^([^\/]+)\/_config$/))) {
+    overlay = getOverlay(match[1], dict);
+    overlay.options = options = require(name)['default'];
+    if (options.include) {
+      if (!Ember.isArray(options.include)) {
+        options.include = [options.include];
+      }
+    }
+    else {
+      options.include = [];
+    }
+  }
+  else if ((match = base.match(/^([^\/]+)\/([^\/]+)$/))) {
+    overlay = getOverlay(match[1], dict);
+    modelName = match[2];
+    overlay.fixtures[modelName] = require(name)['default'];
+  }
+  return overlay;
+}
+
+/**
+ * Overrides an adapter
+ *
+ * @param {string} name
+ * @param {Object} [extension={}]
+ * @param {Ember.Application} app
+ * @return {subclass of DevFixturesAdapter}
+ */
+function overrideAdapter(name, extension, app) {
+  var path = ENV.modulePrefix + '/adapters/' + name, Class, Module;
+  if (require.entries[path]) {
+    Module = require(path);
   }
   Class = DevFixturesAdapter.extend(extension || {});
-  if (hasModule) {
+  if (Module) {
     Module['default'] = Class;
   }
   app.register('adapter:' + name, Class);
+  app.inject('adapter:' + name, 'FIXTURES', 'dev-fixtures:main');
+  app.inject('adapter:' + name, 'OVERLAYS', 'dev-fixtures:overlays');
   return Class;
 }
 
+/**
+ * Initialize our dev-fixtures stuffs
+ *
+ * @param {Ember.Container} container
+ * @param {Ember.Application} application
+ */
 export function initialize(container, application) {
-  var adapterNames, regexp, base, adapterOverrides = {}, name;
-  regexp = new RegExp('^' + ENV.modulePrefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '/fixtures/');
+  var adapterNames, regexp, base, adapterOverrides = {}, fromQP = false,
+    name, BASE_FIXTURES = {}, OVERLAYS = {}, lsKey, currentOverlay;
+  regexp = new RegExp('^' + ENV.modulePrefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\/edf-fixtures\\/');
   for (name in require.entries) {
     if (regexp.test(name)) {
       base = name.replace(regexp, '');
+
       if (/^adapters\/[^\/]+$/.test(base)) {
-        adapterOverrides[base.replace(/^adapters\//, '')] = require(name)['default']
+        // it is an adapter extension
+        adapterOverrides[base.replace(/^adapters\//, '')] = require(name)['default'];
+      }
+      else if (/^overlays\//.test(base)) {
+        // it is an overlay definition or overlay index
+        handleOverlayImport(base.replace(/^overlays\//, ''), name, OVERLAYS);
       }
       else if (!/\//.test(base)) {
-        ALL_FIXTURES[base] = require(name)['default'];
+        // it is a base fixture
+        BASE_FIXTURES[base] = Ember.A(require(name)['default']);
       }
     }
   }
-  application.register('dev-fixtures:main', ALL_FIXTURES, {instantiate: false});
+
+  // grab the overlay name if any from the URL
+  location.href.replace(/(?:\?|&)FIXTURES_OVERLAY=([^&#$]+)/, function (dummy, value) {
+    currentOverlay = value;
+    fromQP = true;
+  });
+
+  // persist or read the overlay from local storage if accessible
+  if (window.localStorage) {
+    lsKey = ENV.modulePrefix + '$dev-fixtures-overlay';
+    if (currentOverlay !== undefined) {
+      window.localStorage.setItem(lsKey, currentOverlay);
+    }
+    else {
+      currentOverlay = window.localStorage.getItem(lsKey);
+    }
+  }
+
+  // override fixtures regarding the current overlay
+  overrideFixturesWithOverlay(
+    BASE_FIXTURES, OVERLAYS, currentOverlay, fromQP ? 'URL query parameter' : 'local storage value'
+  );
+
+  // register the fixtures and overlays
+  application.register('dev-fixtures:main', BASE_FIXTURES, {instantiate: false});
+  application.register('dev-fixtures:overlays', OVERLAYS, {instantiate: false});
+
+  // create or override the adapters and inject the fixtures and overlays
   adapterNames = Ember.getWithDefault(ENV, 'devFixtures.adapters', ['application']);
   Ember.EnumerableUtils.forEach(adapterNames, function (name) {
     if (!adapterOverrides[name]) {
@@ -45,7 +245,6 @@ export function initialize(container, application) {
   });
   for (name in adapterOverrides) {
     overrideAdapter(name, adapterOverrides[name], application);
-    application.inject('adapter:' + name, 'FIXTURES', 'dev-fixtures:main');
   }
 }
 

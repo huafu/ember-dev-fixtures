@@ -12,11 +12,11 @@ module.exports = {
       // activate it if it is not set at all for dev environment
       return {};
     }
-    return ENV.devFixtures
+    return ENV.devFixtures;
   },
 
-  treeForApp: function (type) {
-    var myConfig, trees = []/*, adapters*/;
+  treeForApp: function () {
+    var myConfig, trees = [];
     myConfig = this.devFixturesConfig();
     if (myConfig) {
       // inject our private tree into the app
@@ -25,15 +25,12 @@ module.exports = {
         files:   ['**/*.js'],
         destDir: '/'
       }));
+      // inject the fixtures tree into the app
       trees.push(this.pickFiles(this.treeGenerator(sysPath.join(this.project.root, 'fixtures')), {
         srcDir:  '/',
         files:   ['**/*.js'],
-        destDir: '/fixtures'
+        destDir: '/edf-fixtures'
       }));
-      //adapters = myConfig.adapters || ['application'];
-      //adapters.forEach(function(name){
-      //  trees.push();
-      //});
       return this.mergeTrees(trees);
     }
   }
