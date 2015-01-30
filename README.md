@@ -87,6 +87,9 @@ adapter. Here are some of the provided methods:
     
     - `deleteLoadedFixture(<type>, <fixtureRecord>)`: used to delete the given record from the fixtures.
 
+* A `_fixtureMeta` attribute is added on all your models which have fixtures. For now it contains
+one property only: `sources`. It is the list containing the fixture and overlay(s) file path(s) that
+as been used as source for that record. 
 
 ## Author
 
