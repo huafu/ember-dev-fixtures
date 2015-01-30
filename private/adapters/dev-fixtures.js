@@ -434,7 +434,7 @@ export default DS.Adapter.extend({
       }
     }
     else {
-      throw new Error('Deleting a fixture required an ID.');
+      throw new Error('Deleting a fixture requires an ID.');
     }
     return null;
   }
