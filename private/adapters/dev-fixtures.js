@@ -2,6 +2,10 @@ import Ember from 'ember';
 import DS from 'ember-data';
 
 var forEach = Ember.EnumerableUtils.forEach;
+var find = Ember.EnumerableUtils.find;
+var slice = [].slice;
+var isArray = Ember.isArray;
+var pluralize = Ember.String.pluralize;
 
 var HTTP_STATUS_MESSAGES = {
   100: "Continue",
@@ -74,6 +78,25 @@ function coerceId(id) {
   return id;
 }
 
+function findById(records, id) {
+  id = coerceId(id);
+  return find(records, function (record) {
+    return coerceId(record.id) === id;
+  });
+}
+
+function injectNoConflict(into, fixtures) {
+  forEach(fixtures, function (fixture) {
+    var found = findById(into, fixture.id);
+    Ember.assert('Another fixture with same ID found in the response.', !found || found === fixture);
+    if (!found) {
+      into.push(fixture);
+    }
+  });
+}
+
+var counter = 1;
+
 /**
  * @class DevFixturesAdapter
  * @extends DS.Adapter
@@ -109,10 +132,40 @@ export default DS.Adapter.extend({
   }),
 
   /**
+   * Generate the JSON for a record
+   *
+   * @method mockJSON
+   * @param {DS.Store} store
+   * @param {subclass of DS.Model} type
+   * @param {DS.Model} record
+   * @param {boolean} [addId=false]
+   * @return {Object}
+   */
+  mockJSON: function (store, type, record, addId) {
+    var json = store.serializerFor(this._parseModelOrType(type, store)).serialize(record, {includeId: true});
+    if (!json.id && addId) {
+      json.id = this.generateIdForRecord(store);
+    }
+    return json;
+  },
+
+  /**
+   * Generates an ID for a record
+   *
+   * @method generateIdForRecord
+   * @param {DS.Store} store
+   * @param {DS.Model} record
+   * @return {String} id
+   */
+  generateIdForRecord: function (/*store, record, id*/) {
+    return 'fixture-' + counter++;
+  },
+
+  /**
    * @inheritDoc
    */
   find: function (store, type, id) {
-    var record = this.fixtureForId(type, id);
+    var record = this.fixtureForId(store, type, id);
     if (record) {
       return this.simulateRemoteCall(this.createSingleRecordResponse(store, type, record));
     }
@@ -126,7 +179,7 @@ export default DS.Adapter.extend({
    */
   findAll: function (store, type) {
     return this.simulateRemoteCall(
-      this.createMultiRecordsResponse(store, type, this.fixturesForType(type))
+      this.createMultiRecordsResponse(store, type, this.fixturesForType(store, type))
     );
   },
 
@@ -135,7 +188,7 @@ export default DS.Adapter.extend({
    */
   findQuery: function (store, type, query) {
     return this.simulateRemoteCall(this.createMultiRecordsResponse(
-      store, type, this.queryFixtures(this.fixturesForType(type), query)
+      store, type, this.queryFixtures(this.fixturesForType(store, type), query)
     ));
   },
 
@@ -145,7 +198,7 @@ export default DS.Adapter.extend({
   findMany: function (store, type, ids) {
     var records = [], missingRecordIds = [];
     Ember.A(ids).forEach(function (id) {
-      var record = this.fixtureForId(type, id);
+      var record = this.fixtureForId(store, type, id);
       if (record) {
         records.push(record);
       }
@@ -161,8 +214,8 @@ export default DS.Adapter.extend({
    * @inheritDoc
    */
   createRecord: function (store, type, record) {
-    var fixture = this.mockJSON(store, type, record);
-    fixture = this.updateFixtures(type, fixture);
+    var fixture = this.mockJSON(store, type, record, true);
+    fixture = this.updateFixtures(store, type, fixture);
     return this.simulateRemoteCall(this.createSingleRecordResponse(store, type, fixture));
   },
 
@@ -171,7 +224,7 @@ export default DS.Adapter.extend({
    */
   updateRecord: function (store, type, record) {
     var fixture = this.mockJSON(store, type, record);
-    fixture = this.updateFixtures(type, fixture);
+    fixture = this.updateFixtures(store, type, fixture);
     return this.simulateRemoteCall(this.createSingleRecordResponse(store, type, fixture));
   },
 
@@ -179,7 +232,7 @@ export default DS.Adapter.extend({
    * @inheritDoc
    */
   deleteRecord: function (store, type, record) {
-    this.deleteLoadedFixture(type, record);
+    this.deleteLoadedFixture(store, type, record);
     return this.simulateRemoteCall(this.createDeletedRecordResponse(store, type, record));
   },
 
@@ -207,8 +260,10 @@ export default DS.Adapter.extend({
   /**
    * @inheritDoc
    */
-  fixturesForType: function (type) {
-    var key = type.typeKey;
+  fixturesForType: function (store, type) {
+    var key;
+    type = this._parseModelOrType(type, store);
+    key = type.typeKey;
     if (!this.FIXTURES[key]) {
       this.FIXTURES[key] = Ember.A([]);
     }
@@ -219,13 +274,14 @@ export default DS.Adapter.extend({
    * Get a fixture for a given type and ID
    *
    * @method fixtureForId
+   * @param {DS.Store} store
    * @param {DS.Model} type
    * @param {string|number} id
    * @return {Object}
    */
-  fixtureForId: function (type, id) {
+  fixtureForId: function (store, type, id) {
     id = coerceId(id);
-    return this.fixturesForType(type).find(function (record) {
+    return this.fixturesForType(store, type).find(function (record) {
       return coerceId(record.id) === id;
     });
   },
@@ -263,6 +319,7 @@ export default DS.Adapter.extend({
         status:       statusCode,
         statusText:   statusText
       };
+      console.log('[dev-fixtures] Simulating response:', value);
       if (adapter.get('simulateRemoteResponse')) {
         // Schedule with setTimeout
         Ember.run.later(function () {
@@ -283,13 +340,14 @@ export default DS.Adapter.extend({
    * Complete a JSON response to add linked records which are not async
    *
    * @method completeJsonResponse
-   * @param {Object} json
    * @param {DS.Store} store
+   * @param {Object} json
+   * @param {string|DS.Model|Object} [injections...]
    */
-  completeJsonResponse: function (json, store) {
+  completeJsonResponse: function (store, json) {
     var handledRecords = [], key, records, handleRecord, Model;
     handleRecord = function (record) {
-      this.completeJsonForRecord(record, Model, json, handledRecords);
+      this.completeJsonForRecord(store, record, Model, json, handledRecords);
     };
     for (key in json) {
       if (json.hasOwnProperty(key)) {
@@ -305,18 +363,19 @@ export default DS.Adapter.extend({
    * Complete a record adding in the given json the related records which are not defined as async
    *
    * @method completeJsonForRecord
+   * @param {DS.Store} store
    * @param {DS.Model} record
    * @param {subclass of DS.Model} Model
    * @param {Object} json
    * @param {Array.<DS.Model>} handledRecords
    */
-  completeJsonForRecord: function (record, Model, json, handledRecords) {
+  completeJsonForRecord: function (store, record, Model, json, handledRecords) {
     if (handledRecords.indexOf(record) === -1) {
       handledRecords.push(record);
       Model.eachRelationship(function (name, meta) {
         var related, fixtures, relatedTypeKey, ids;
         if (!meta.async && record[name]) {
-          fixtures = Ember.A(this.fixturesForType(meta.type));
+          fixtures = Ember.A(this.fixturesForType(store, meta.type));
           ids = coerceId(record[name]);
           if (meta.kind === 'hasMany') {
             if (ids && ids.length) {
@@ -334,7 +393,7 @@ export default DS.Adapter.extend({
             }
           }
           if (related) {
-            relatedTypeKey = meta.type.typeKey.pluralize();
+            relatedTypeKey = pluralize(meta.type.typeKey);
             if (!json[relatedTypeKey]) {
               json[relatedTypeKey] = [];
             }
@@ -342,7 +401,7 @@ export default DS.Adapter.extend({
               if (json[relatedTypeKey].indexOf(record) === -1) {
                 json[relatedTypeKey].push(record);
               }
-              this.completeJsonForRecord(record, meta.type, json, handledRecords);
+              this.completeJsonForRecord(store, record, meta.type, json, handledRecords);
             }, this);
           }
         }
@@ -361,8 +420,10 @@ export default DS.Adapter.extend({
    */
   createSingleRecordResponse: function (store, type, record) {
     var json = {};
-    json[type.typeKey.pluralize()] = [record];
-    return this.completeJsonResponse(json, store);
+    type = this._parseModelOrType(type, store);
+    json[pluralize(type.typeKey)] = [record];
+    this._injectFixturesInResponse.apply(this, store, [json].concat(slice.call(arguments, 3)));
+    return this.completeJsonResponse(store, json);
   },
 
   /**
@@ -376,8 +437,10 @@ export default DS.Adapter.extend({
    */
   createMultiRecordsResponse: function (store, type, records) {
     var json = {};
-    json[type.typeKey.pluralize()] = records;
-    return this.completeJsonResponse(json, store);
+    type = this._parseModelOrType(type, store);
+    json[pluralize(type.typeKey)] = records;
+    this._injectFixturesInResponse.apply(this, store, [json].concat(slice.call(arguments, 3)));
+    return this.completeJsonResponse(store, json);
   },
 
   /**
@@ -397,46 +460,112 @@ export default DS.Adapter.extend({
    * Update the fixture for given type and fixture record
    *
    * @method updateFixtures
-   * @param {DS.Model} type
+   * @param {DS.Store} store
+   * @param {DS.Model|string} type
    * @param {Object} fixtureRecord
    * @return {Object}
    */
-  updateFixtures: function (type, fixtureRecord) {
+  updateFixtures: function (store, type, fixtureRecord) {
     var fixture;
     if (fixtureRecord.id) {
-      fixture = this.fixtureForId(type, fixtureRecord.id);
+      fixture = this.fixtureForId(store, type, fixtureRecord.id);
       if (fixture) {
         Ember.merge(fixture, fixtureRecord);
         return fixture;
       }
     }
     else {
-      throw new Error('Updating a fixture required an ID.');
+      throw new Error('Updating a fixture requires an ID.');
     }
-    this.fixturesForType(type).pushObject(fixtureRecord);
+    this.fixturesForType(store, type).pushObject(fixtureRecord);
     return fixtureRecord;
   },
+
+  /**
+   * Creates a new fixture record and update fixtures with it
+   *
+   * @method createFixture
+   * @param {DS.Store} store
+   * @param {DS.Model|string} type
+   * @param {Object} [fixtureRecord={}]
+   * @return {Object}
+   */
+  createFixture: function (store, type, fixtureRecord) {
+    var fixture = fixtureRecord || {};
+    type = this._parseModelOrType(type, store);
+    if (!fixtureRecord.id) {
+      fixtureRecord.id = this.generateIdForRecord();
+    }
+    if (this.fixtureForId(store, type, fixture.id)) {
+      throw new Error('Fixture `' + type.typeKey + '` with id `' + fixture.id + '` already exists.');
+    }
+    this.fixturesForType(store, type).push(fixture);
+    return fixture;
+  },
+
 
   /**
    * Deletes a fixture for given type and record
    *
    * @method deleteLoadedFixture
+   * @param {DS.Store} store
    * @param {DS.Model} type
    * @param {Object} fixtureRecord
    * @return {null}
    */
-  deleteLoadedFixture: function (type, fixtureRecord) {
+  deleteLoadedFixture: function (store, type, fixtureRecord) {
     var fixture;
     if (fixtureRecord.id) {
-      fixture = this.fixtureForId(type, fixtureRecord.id);
+      fixture = this.fixtureForId(store, type, fixtureRecord.id);
       if (fixture) {
-        this.fixturesForType(type).without(fixtureRecord);
+        this.fixturesForType(store, type).without(fixtureRecord);
       }
     }
     else {
       throw new Error('Deleting a fixture requires an ID.');
     }
     return null;
-  }
+  },
 
+
+  /**
+   * Inject fixtures into the given json
+   *
+   * @method _injectFixturesInResponse
+   * @param {Object} json
+   * @param {DS.Store} store
+   * @return {Object}
+   */
+  _injectFixturesInResponse: function (json, store) {
+    var i, args = slice.call(arguments, 2), len = args.length, records, typeKey, dict;
+    for (i = 0; i < len; i += 2) {
+      records = args[i + 1];
+      records = isArray(records) ? records.slice() : [records];
+      typeKey = pluralize(this._parseModelOrType(args[i], store));
+      if (!json[typeKey]) {
+        json[typeKey] = records;
+      }
+      else {
+        injectNoConflict(json[typeKey], records);
+      }
+    }
+    return json;
+  },
+
+
+  /**
+   * Internal function to get the model of a record
+   *
+   * @method _parseModelOrType
+   * @param {string|subclass of DS.Model} modelOrType
+   * @param {DS.Store} store
+   * @return {subclass of DS.Model}
+   * @private
+   */
+  _parseModelOrType: function (modelOrType, store) {
+    if (typeof modelOrType === 'string') {
+      return store.modelFor(modelOrType);
+    }
+    return modelOrType;
+  }
 });
