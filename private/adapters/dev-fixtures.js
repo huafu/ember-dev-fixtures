@@ -5,6 +5,7 @@ var forEach = Ember.EnumerableUtils.forEach;
 var find = Ember.EnumerableUtils.find;
 var slice = [].slice;
 var isArray = Ember.isArray;
+var copy = Ember.copy;
 var pluralize = Ember.String.pluralize;
 
 var HTTP_STATUS_MESSAGES = {
@@ -142,7 +143,7 @@ export default DS.Adapter.extend({
    * @return {Object}
    */
   mockJSON: function (store, type, record, addId) {
-    var json = store.serializerFor(this._parseModelOrType(type, store)).serialize(record, {includeId: true});
+    var json = store.serializerFor(this._parseModelOrType(store, type)).serialize(record, {includeId: true});
     if (!json.id && addId) {
       json.id = this.generateIdForRecord(store);
     }
@@ -262,7 +263,7 @@ export default DS.Adapter.extend({
    */
   fixturesForType: function (store, type) {
     var key;
-    type = this._parseModelOrType(type, store);
+    type = this._parseModelOrType(store, type);
     key = type.typeKey;
     if (!this.FIXTURES[key]) {
       this.FIXTURES[key] = Ember.A([]);
@@ -312,14 +313,16 @@ export default DS.Adapter.extend({
     return new Ember.RSVP.Promise(function (resolve, reject) {
       var value, func;
       func = isOk ? resolve : reject;
-      value = Ember.copy(responseFunction(), true);
+      value = copy(responseFunction(), true);
       value = isOk ? value : {
         response:     value,
         responseJSON: value,
         status:       statusCode,
         statusText:   statusText
       };
-      console.log('[dev-fixtures] Simulating response:', value);
+      Ember.runInDebug(function () {
+        console.log('[dev-fixtures] Simulating response:', copy(value, true));
+      });
       if (adapter.get('simulateRemoteResponse')) {
         // Schedule with setTimeout
         Ember.run.later(function () {
@@ -420,9 +423,9 @@ export default DS.Adapter.extend({
    */
   createSingleRecordResponse: function (store, type, record) {
     var json = {};
-    type = this._parseModelOrType(type, store);
+    type = this._parseModelOrType(store, type);
     json[pluralize(type.typeKey)] = [record];
-    this._injectFixturesInResponse.apply(this, store, [json].concat(slice.call(arguments, 3)));
+    this._injectFixturesInResponse.apply(this, [store, json].concat(slice.call(arguments, 3)));
     return this.completeJsonResponse(store, json);
   },
 
@@ -437,9 +440,9 @@ export default DS.Adapter.extend({
    */
   createMultiRecordsResponse: function (store, type, records) {
     var json = {};
-    type = this._parseModelOrType(type, store);
+    type = this._parseModelOrType(store, type);
     json[pluralize(type.typeKey)] = records;
-    this._injectFixturesInResponse.apply(this, store, [json].concat(slice.call(arguments, 3)));
+    this._injectFixturesInResponse.apply(this, [store, json].concat(slice.call(arguments, 3)));
     return this.completeJsonResponse(store, json);
   },
 
@@ -468,15 +471,20 @@ export default DS.Adapter.extend({
   updateFixtures: function (store, type, fixtureRecord) {
     var fixture;
     if (fixtureRecord.id) {
+      type = this._parseModelOrType(store, type);
+      // lookup for a fixture
       fixture = this.fixtureForId(store, type, fixtureRecord.id);
       if (fixture) {
         Ember.merge(fixture, fixtureRecord);
+        this._touchDateAttr(store, type, fixture, 'updatedAt');
         return fixture;
       }
     }
     else {
       throw new Error('Updating a fixture requires an ID.');
     }
+    // new fixture
+    this._touchDateAttr(store, type, fixtureRecord, 'createdAt', 'updatedAt');
     this.fixturesForType(store, type).pushObject(fixtureRecord);
     return fixtureRecord;
   },
@@ -491,16 +499,15 @@ export default DS.Adapter.extend({
    * @return {Object}
    */
   createFixture: function (store, type, fixtureRecord) {
-    var fixture = fixtureRecord || {};
-    type = this._parseModelOrType(type, store);
+    var fixture = fixtureRecord || {}, now;
+    type = this._parseModelOrType(store, type);
     if (!fixtureRecord.id) {
       fixtureRecord.id = this.generateIdForRecord();
     }
     if (this.fixtureForId(store, type, fixture.id)) {
       throw new Error('Fixture `' + type.typeKey + '` with id `' + fixture.id + '` already exists.');
     }
-    this.fixturesForType(store, type).push(fixture);
-    return fixture;
+    return this.updateFixtures(store, type, fixture);
   },
 
 
@@ -514,11 +521,12 @@ export default DS.Adapter.extend({
    * @return {null}
    */
   deleteLoadedFixture: function (store, type, fixtureRecord) {
-    var fixture;
+    var fixture, fixturesArray;
     if (fixtureRecord.id) {
       fixture = this.fixtureForId(store, type, fixtureRecord.id);
       if (fixture) {
-        this.fixturesForType(store, type).without(fixtureRecord);
+        fixturesArray = this.fixturesForType(store, type);
+        fixturesArray.splice(fixturesArray.indexOf(fixtureRecord), 1);
       }
     }
     else {
@@ -532,16 +540,16 @@ export default DS.Adapter.extend({
    * Inject fixtures into the given json
    *
    * @method _injectFixturesInResponse
-   * @param {Object} json
    * @param {DS.Store} store
+   * @param {Object} json
    * @return {Object}
    */
-  _injectFixturesInResponse: function (json, store) {
+  _injectFixturesInResponse: function (store, json) {
     var i, args = slice.call(arguments, 2), len = args.length, records, typeKey, dict;
     for (i = 0; i < len; i += 2) {
       records = args[i + 1];
       records = isArray(records) ? records.slice() : [records];
-      typeKey = pluralize(this._parseModelOrType(args[i], store));
+      typeKey = pluralize(this._parseModelOrType(store, args[i]).typeKey);
       if (!json[typeKey]) {
         json[typeKey] = records;
       }
@@ -557,15 +565,33 @@ export default DS.Adapter.extend({
    * Internal function to get the model of a record
    *
    * @method _parseModelOrType
-   * @param {string|subclass of DS.Model} modelOrType
    * @param {DS.Store} store
+   * @param {string|subclass of DS.Model} modelOrType
    * @return {subclass of DS.Model}
    * @private
    */
-  _parseModelOrType: function (modelOrType, store) {
+  _parseModelOrType: function (store, modelOrType) {
     if (typeof modelOrType === 'string') {
       return store.modelFor(modelOrType);
     }
     return modelOrType;
+  },
+
+  /**
+   * Update the date of the fixture at given attribute(s) to now (if the attribute is defined in the model)
+   *
+   * @method _touchDateAttr
+   * @param {DS.Store} store
+   * @param {subclass of DS.Model|string} type
+   * @param {Object} fixture
+   * @param {string} attributes...
+   */
+  _touchDateAttr: function (store, type, fixture) {
+    var now = (new Date()).toISOString(), attributes = slice.call(arguments, 3);
+    this._parseModelOrType(store, type).eachAttribute(function (name, meta) {
+      if (attributes.indexOf(name) !== -1 && !meta.type || meta.type === 'date') {
+        fixture[name] = now;
+      }
+    });
   }
 });
