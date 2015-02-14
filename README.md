@@ -64,36 +64,47 @@ to create a fixture extension.
     finally merge with that overlay's fixtures. If a fixture has a `__removeFixture` property set to
     `true`, then this record will be removed from the fixture array if it exists.
     
+    You can also force an overlay per build with the `EMBER_CLI_DEV_FIXTURES` environment variable,
+    by setting it to the name of the overlay you want to enable. Be aware that this will activate
+    fixtures for any `--environment` specified, even production. The URL parameter will take
+    precedence if it is found, else this one will be used, and finally the one found in the local
+    storage.
+    
 * The `DevFixtureAdapter` was previously extending the `DS.FixtureAdapter` but it is now since `0.0.2`
-a full rewrite, extending the `DS.Adapter`. It is working as if your serialized was a `DS.RESTSerializer`
-and has useful methods so that you can add extension for each model or for all with the `application`
-adapter. Here are some of the provided methods:
+a full rewrite, extending the `DS.Adapter`. It is working as if your serializer was a
+`DS.RESTSerializer` and has useful methods so that you can add extension for each model or for all
+with the `application` adapter. Here are some of the provided methods:
 
     - `simulateRemoteCall(<response>, <statusCode=200>, <statusText>)`: Simulates a response with
     the data given in `<response>`. If the `<statusCode>` is given and not `2xx` then the promise
     will be rejected, The `<statusText>` is either automatic regarding the `<statusCode>` or you can
     provide one.
     
-    - `createSingleRecordResponse(<store>, <type>, <record>)`: creates a response JSON for a
-    response containing one record.
+    - `createSingleRecordResponse(<store>, <type>, <record>[, <other-type>, <other-records>, ...])`:
+    creates a response JSON for a response containing one record.
     
-    - `createMultiRecordsResponse(<store>, <type>, <records>)`: creates a response JSON for a
-    response containing many records of the given type.
+    - `createMultiRecordsResponse(<store>, <type>, <records>[, <other-type>, <other-records>, ...])`:
+    creates a response JSON for a response containing many records of the given type.
     
     - `createDeletedRecordResponse(<store>, <type>, <record>)`: creates a response JSON for a
     response containing a deleted record.
     
-    - `updateFixtures(<type>, <fixtureRecord>)`: Used to update the given record in the fixtures.
+    - `updateFixtures(<store>, <type>, <fixtureRecord>[, <auto-gen-id>])`: Used to save the given
+    record in the fixtures, doing a merge if it already exists.
     
-    - `deleteLoadedFixture(<type>, <fixtureRecord>)`: used to delete the given record from the fixtures.
+    - `deleteLoadedFixture(<store>, <type>, <fixtureRecord>)`: used to delete the given record from
+    the fixtures.
+    
+    - `createFixture(<store>, <type>, <fixtureRecord>)`: creates a new fixture for the given type
+    and data.
 
 * A `_fixtureMeta` attribute is added on all your models which have fixtures. For now it contains
-one property only: `sources`. It is the list containing the fixture and overlay(s) file path(s) that
-as been used as source for that record. 
+one property only: `sources`. It is the list of all the fixture and overlay file path(s) that
+have been used as source for that record.
 
 ## Author
 
-Huafu Gandon - Follow me on twitter: [huafu_g](https://twitter.com/huafu_g)
+[Huafu Gandon](http://huafu.github.io) - Follow me on twitter: [@huafu_g](https://twitter.com/huafu_g)
 
 ---
 
