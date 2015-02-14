@@ -258,6 +258,9 @@ export function initialize(container, application) {
     currentOverlay = value;
     fromQP = true;
   });
+  if (!currentOverlay && ENV.devFixtures.overlay) {
+    currentOverlay = ENV.devFixtures.overlay;
+  }
 
   // persist or read the overlay from local storage if accessible
   if (window.localStorage) {
