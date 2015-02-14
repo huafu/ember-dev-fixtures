@@ -143,10 +143,18 @@ export default DS.Adapter.extend({
    * @return {Object}
    */
   mockJSON: function (store, type, record, addId) {
-    var json = store.serializerFor(this._parseModelOrType(store, type)).serialize(record, {includeId: true});
+    var json;
+    type = this._parseModelOrType(store, type);
+    json = store.serializerFor(type).serialize(record, {includeId: true});
     if (!json.id && addId) {
       json.id = this.generateIdForRecord(store);
     }
+    type.eachRelationship(function (key, meta) {
+      var records;
+      if (!meta.async && meta.kind === 'hasMany' && (records = record.get(key)) && !json[key]) {
+        json[key] = records.mapBy('id').filter(Boolean);
+      }
+    });
     return json;
   },
 
@@ -548,7 +556,7 @@ export default DS.Adapter.extend({
     var i, args = slice.call(arguments, 2), len = args.length, records, typeKey, dict;
     for (i = 0; i < len; i += 2) {
       records = args[i + 1];
-      records = isArray(records) ? records.slice() : [records];
+      records = records ? (isArray(records) ? records.slice() : [records]) : [];
       typeKey = pluralize(this._parseModelOrType(store, args[i]).typeKey);
       if (!json[typeKey]) {
         json[typeKey] = records;
