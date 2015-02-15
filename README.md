@@ -64,10 +64,11 @@ to create a fixture extension.
     finally merge with that overlay's fixtures. If a fixture has a `__removeFixture` property set to
     `true`, then this record will be removed from the fixture array if it exists.
     
-    You can also force an overlay per build with the `ENV.devFixtures.overlay` config key in
+    You can also force an overlay per build with the `ENV.APP.devFixtures.overlay` config key in
     `config/environment.js`. Set it to the name of overlay you want to enable. The URL parameter
     will take precedence if it is found, else this one will be used, and finally the one found in the
-    local storage if any from previous load.
+    local storage if any from previous load. This allows you to call `startApp` in the acceptance
+    tests with a different overlay: `startApp({devFixtures: {overlay: 'my-overlay'}});`.
     
 * The `DevFixtureAdapter` was previously extending the `DS.FixtureAdapter` but it is now since `0.0.2`
 a full rewrite, extending the `DS.Adapter`. It is working as if your serializer was a
