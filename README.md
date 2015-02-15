@@ -27,12 +27,12 @@ of the unpacked folder of the zip-file and it would work straight away.
 ## Usage
 
 * By default the adapter will be used as the `adapter:application`, but you can override any other
-adapter of your application by defining their names in `devFixtures.adapters` array of your
+adapter of your application by defining their names in `ENV.APP.devFixtures.adapters` array of your
 `config/environment.js`.
 
-* To disable the adapter in `development` environment, set `devFixtures` to `false`. By default it
-is activated for development environment and disabled for all others. You might want to set it to
-`true` (or `{}`) for the test environment for example.
+* To disable the adapter in `development` environment, set `ENV.APP.devFixtures` to `false`. By
+default it is activated for development environment and disabled for all others. You might want to
+set it to `true` (or `{}`) for the test environment for example.
 
 * Define your fixtures in `fixtures/<model-name>.js` files of your application as an array. You can
 use the blueprint to generate it: `ember g dev-fixture <model-name>`.
@@ -50,7 +50,7 @@ correct payload for whatever request you'll do with the store.
 
     There is a blueprint for this too: `ember g dev-fixture-adapter <model-name>`. Those, as well as
     the fixtures, won't be included in your production build or any build where you did not activated
-    this addon (cf `devFixtures.adapters` above).
+    this addon (cf `ENV.APP.devFixtures.adapters` above).
     
 * The powerfulness of this addon are the overlays. You can define base fixtures and then some overlays
 that you'd activate with the query parameter `FIXTURES_OVERLAY=<overlay-name>`. An overlay is a folder

@@ -30,7 +30,7 @@ module.exports = {
     var target = (parentAddon || app),
       config = target.project.config(target.env),
       isDev = target.env === 'development';
-    config = isDev && config.devFixtures === undefined ? {} : config.devFixtures;
+    config = isDev && config.APP.devFixtures === undefined ? {} : config.APP.devFixtures;
     this.devFixturesConfig = config;
   }
 };

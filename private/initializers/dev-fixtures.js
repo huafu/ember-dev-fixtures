@@ -258,8 +258,8 @@ export function initialize(container, application) {
     currentOverlay = value;
     fromQP = true;
   });
-  if (!currentOverlay && ENV.devFixtures.overlay) {
-    currentOverlay = ENV.devFixtures.overlay;
+  if (!currentOverlay && application.get('devFixtures.overlay')) {
+    currentOverlay = application.get('devFixtures.overlay');
   }
 
   // persist or read the overlay from local storage if accessible
@@ -282,7 +282,7 @@ export function initialize(container, application) {
   application.register('dev-fixtures:main', BASE_FIXTURES, {instantiate: false});
 
   // create or override the adapters and inject the fixtures and overlays
-  adapterNames = Ember.getWithDefault(ENV, 'devFixtures.adapters', ['application']);
+  adapterNames = application.getWithDefault('devFixtures.adapters', ['application']);
   Ember.EnumerableUtils.forEach(adapterNames, function (name) {
     if (!adapterOverrides[name]) {
       adapterOverrides[name] = {};
