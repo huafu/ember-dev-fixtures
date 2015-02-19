@@ -7,6 +7,11 @@ var slice = [].slice;
 var isArray = Ember.isArray;
 var copy = Ember.copy;
 var pluralize = Ember.String.pluralize;
+var run = Ember.run;
+var bind = run.bind;
+var later = run.later;
+var schedule = run.schedule;
+var computed = Ember.computed;
 
 var HTTP_STATUS_MESSAGES = {
   100: "Continue",
@@ -128,7 +133,7 @@ export default DS.Adapter.extend({
   /**
    * @inheritDoc
    */
-  serializer: Ember.computed(function () {
+  serializer: computed(function () {
     return undefined;
   }),
 
@@ -306,25 +311,30 @@ export default DS.Adapter.extend({
    * @return {Promise}
    */
   simulateRemoteCall: function (response, statusCode, statusText) {
-    var adapter = this, responseFunction, isOk;
+    var adapter = this, responseFunction, isOk, shouldCopy;
     statusCode = statusCode || 200;
     statusText = statusText || HTTP_STATUS_MESSAGES[statusCode];
     isOk = Math.round(statusCode / 100) === 2;
     if (typeof response === 'function' || typeof response === 'string') {
-      responseFunction = Ember.run.bind(this, response);
+      shouldCopy = true;
+      responseFunction = bind(this, response);
     }
     else {
-      responseFunction = Ember.run.bind(null, function () {
+      response = copy(response, true);
+      responseFunction = function () {
         return response;
-      });
+      };
     }
     return new Ember.RSVP.Promise(function (resolve, reject) {
-      var value, func;
+      var value, func, data;
       func = isOk ? resolve : reject;
-      value = copy(responseFunction(), true);
-      value = isOk ? value : {
-        response:     value,
-        responseJSON: value,
+      data = responseFunction();
+      if (shouldCopy) {
+        data = copy(data, true);
+      }
+      value = isOk ? data : {
+        response:     data,
+        responseJSON: data,
         status:       statusCode,
         statusText:   statusText
       };
@@ -333,15 +343,11 @@ export default DS.Adapter.extend({
       });
       if (adapter.get('simulateRemoteResponse')) {
         // Schedule with setTimeout
-        Ember.run.later(function () {
-          func(value);
-        }, adapter.get('latency'));
+        later(null, func, value, adapter.get('latency'));
       }
       else {
         // Asynchronous, but at the of the runloop with zero latency
-        Ember.run.schedule('actions', null, function () {
-          func(value);
-        });
+        schedule('actions', null, func, value);
       }
     }, "DS: DevFixtureAdapter#simulateRemoteCall");
   },
