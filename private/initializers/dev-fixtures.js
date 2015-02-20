@@ -229,7 +229,7 @@ function extendModel(name) {
  * @param {Ember.Application} application
  */
 export function initialize(container, application) {
-  var adapterNames, regexp, base, adapterOverrides = {}, fromQP = false,
+  var adapterNames, regexp, base, adapterOverrides = {}, from,
     name, BASE_FIXTURES = {}, OVERLAYS = {}, lsKey, currentOverlay;
   regexp = new RegExp('^' + ENV.modulePrefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\/ember\\-dev\\-fixtures\\/');
   for (name in require.entries) {
@@ -254,28 +254,35 @@ export function initialize(container, application) {
   }
 
   // grab the overlay name if any from the URL
-  location.href.replace(/(?:\?|&)FIXTURES_OVERLAY=([^&#$]+)/, function (dummy, value) {
-    currentOverlay = value;
-    fromQP = true;
+  location.href.replace(/(?:\?|&)FIXTURES_OVERLAY(?:=([^&#$]*))?(?:&|#|$)/, function (dummy, value) {
+    currentOverlay = value ? decodeURIComponent(value) : null;
+    from = 'URL query parameter';
   });
-  if (!currentOverlay && application.get('devFixtures.overlay')) {
+  if (currentOverlay === undefined && application.get('devFixtures.overlay') !== undefined) {
     currentOverlay = application.get('devFixtures.overlay');
+    from = 'config file';
   }
 
   // persist or read the overlay from local storage if accessible
   if (window.localStorage) {
     lsKey = ENV.modulePrefix + '$dev-fixtures-overlay';
     if (currentOverlay !== undefined) {
-      window.localStorage.setItem(lsKey, currentOverlay);
+      if (currentOverlay) {
+        window.localStorage.setItem(lsKey, currentOverlay);
+      }
+      else {
+        window.localStorage.removeItem(lsKey);
+      }
     }
     else {
       currentOverlay = window.localStorage.getItem(lsKey);
+      from = 'local storage';
     }
   }
 
   // override fixtures regarding the current overlay
   overrideFixturesWithOverlay(
-    BASE_FIXTURES, OVERLAYS, currentOverlay, fromQP ? 'URL query parameter' : 'local storage value'
+    BASE_FIXTURES, OVERLAYS, currentOverlay, from
   );
 
   // register the fixtures and overlays
