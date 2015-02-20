@@ -7,6 +7,7 @@ var slice = [].slice;
 var isArray = Ember.isArray;
 var copy = Ember.copy;
 var pluralize = Ember.String.pluralize;
+var singularize = Ember.String.singularize;
 var run = Ember.run;
 var bind = run.bind;
 var later = run.later;
@@ -369,7 +370,7 @@ export default DS.Adapter.extend({
     for (key in json) {
       if (json.hasOwnProperty(key)) {
         records = json[key];
-        Model = store.modelFor(key.singularize());
+        Model = store.modelFor(singularize(key));
         forEach(records, handleRecord, this);
       }
     }
