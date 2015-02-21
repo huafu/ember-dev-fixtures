@@ -151,7 +151,7 @@ export default DS.Adapter.extend({
   mockJSON: function (store, type, record, addId) {
     var json;
     type = this._parseModelOrType(store, type);
-    json = store.serializerFor(type).serialize(record, {includeId: true});
+    json = record.serialize({includeId: true});
     if (!json.id && addId) {
       json.id = this.generateIdForRecord(store);
     }
