@@ -4,6 +4,13 @@ import DS from 'ember-data';
 import ENV from '../config/environment';
 import DevFixturesAdapter from '../adapters/dev-fixtures';
 
+
+var forEach = Ember.EnumerableUtils.forEach;
+var keys = Ember.keys;
+var warn = Ember.warn;
+var isArray = Ember.isArray;
+var merge = Ember.merge;
+
 /**
  * Get or create the overlay with given name in the given dictionary
  *
@@ -92,7 +99,7 @@ function overrideFixturesWithOverlay(FIXTURES, OVERLAYS, overlayName, source) {
     }
     // be sure we are not re-including an already included overlay
     if (overlay.injectedBy) {
-      Ember.warn(
+      warn(
         '[ember-dev-fixtures] The overlay `' + overlayName + '` has already been included from ' +
         overlay.injectedBy + '. The ' + source +
         ' is trying to include it as well, but it won\'t be included again.'
@@ -111,7 +118,7 @@ function overrideFixturesWithOverlay(FIXTURES, OVERLAYS, overlayName, source) {
       '` has been injected from ' + overlay.injectedBy + ' which is one of its own inclusion (`include`).');
     }
     // then include the given overlay
-    Ember.EnumerableUtils.forEach(Ember.keys(overlay.fixtures), function (modelName) {
+    forEach(keys(overlay.fixtures), function (modelName) {
       var fixtures, existingFixtures, flagRecord = fixtureSourceFlagger('fixtures/overlays/' + overlayName + '/' + modelName);
       fixtures = overlay.fixtures[modelName];
       existingFixtures = FIXTURES[modelName];
@@ -120,7 +127,7 @@ function overrideFixturesWithOverlay(FIXTURES, OVERLAYS, overlayName, source) {
         FIXTURES[modelName] = existingFixtures = Ember.A([]);
       }
       // loop over all fixtures (records) for this model
-      Ember.EnumerableUtils.forEach(fixtures, function (record) {
+      forEach(fixtures, function (record) {
         var meta;
         // try to find an existing record in the actual fixtures
         meta = recordMetaForId(existingFixtures, record.id);
@@ -132,7 +139,7 @@ function overrideFixturesWithOverlay(FIXTURES, OVERLAYS, overlayName, source) {
           }
           else {
             // else merge it
-            Ember.merge(meta.record, record);
+            merge(meta.record, record);
             flagRecord(meta.record);
           }
         }
@@ -164,7 +171,7 @@ function handleOverlayImport(base, name, dict) {
     overlay = getOverlay(match[1], dict);
     overlay.options = options = require(name)['default'];
     if (options.include) {
-      if (!Ember.isArray(options.include)) {
+      if (!isArray(options.include)) {
         options.include = [options.include];
       }
     }
@@ -265,7 +272,7 @@ export function initialize(container, application) {
 
   // persist or read the overlay from local storage if accessible
   if (window.localStorage) {
-    lsKey = ENV.modulePrefix + '$dev-fixtures-overlay';
+    lsKey = ENV.modulePrefix + '$dev-fixtures-overlay$' + ENV.environment;
     if (currentOverlay !== undefined) {
       if (currentOverlay) {
         window.localStorage.setItem(lsKey, currentOverlay);
@@ -290,7 +297,7 @@ export function initialize(container, application) {
 
   // create or override the adapters and inject the fixtures and overlays
   adapterNames = application.getWithDefault('devFixtures.adapters', ['application']);
-  Ember.EnumerableUtils.forEach(adapterNames, function (name) {
+  forEach(adapterNames, function (name) {
     if (!adapterOverrides[name]) {
       adapterOverrides[name] = {};
     }

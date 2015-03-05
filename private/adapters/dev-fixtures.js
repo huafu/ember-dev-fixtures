@@ -8,6 +8,8 @@ var isArray = Ember.isArray;
 var copy = Ember.copy;
 var pluralize = Ember.String.pluralize;
 var singularize = Ember.String.singularize;
+var dasherize = Ember.String.dasherize;
+var fmt = Ember.String.fmt;
 var run = Ember.run;
 var bind = run.bind;
 var later = run.later;
@@ -278,7 +280,7 @@ export default DS.Adapter.extend({
   fixturesForType: function (store, type) {
     var key;
     type = this._parseModelOrType(store, type);
-    key = type.typeKey;
+    key = dasherize(type.typeKey);
     if (!this.FIXTURES[key]) {
       this.FIXTURES[key] = Ember.A([]);
     }
@@ -334,20 +336,23 @@ export default DS.Adapter.extend({
         data = copy(data, true);
       }
       value = isOk ? data : {
-        response:     data,
-        responseJSON: data,
+        response:     data || {error: statusText},
+        responseJSON: data || {error: statusText},
         status:       statusCode,
         statusText:   statusText
       };
       Ember.runInDebug(function () {
-        console.log('[dev-fixtures] Simulating response:', copy(value, true));
+        console[isOk ? 'log' : 'error'](
+          fmt('[dev-fixtures] Simulating %@ response:', isOk ? 'success' : 'error'),
+          copy(value, true)
+        );
       });
       if (adapter.get('simulateRemoteResponse')) {
         // Schedule with setTimeout
         later(null, func, value, adapter.get('latency'));
       }
       else {
-        // Asynchronous, but at the of the runloop with zero latency
+        // Asynchronous, but at the of the run-loop with zero latency
         schedule('actions', null, func, value);
       }
     }, "DS: DevFixtureAdapter#simulateRemoteCall");
