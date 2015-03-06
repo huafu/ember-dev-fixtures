@@ -519,7 +519,7 @@ export default DS.Adapter.extend({
    * @return {Object}
    */
   createFixture: function (store, type, fixtureRecord) {
-    var fixture = fixtureRecord || {}, now;
+    var fixture = fixtureRecord || {};
     type = this._parseModelOrType(store, type);
     if (!fixtureRecord.id) {
       fixtureRecord.id = this.generateIdForRecord();
@@ -565,7 +565,7 @@ export default DS.Adapter.extend({
    * @return {Object}
    */
   _injectFixturesInResponse: function (store, json) {
-    var i, args = slice.call(arguments, 2), len = args.length, records, typeKey, dict;
+    var i, args = slice.call(arguments, 2), len = args.length, records, typeKey;
     for (i = 0; i < len; i += 2) {
       records = args[i + 1];
       records = records ? (isArray(records) ? records.slice() : [records]) : [];
@@ -609,7 +609,7 @@ export default DS.Adapter.extend({
   _touchDateAttr: function (store, type, fixture) {
     var now = (new Date()).toISOString(), attributes = slice.call(arguments, 3);
     this._parseModelOrType(store, type).eachAttribute(function (name, meta) {
-      if (attributes.indexOf(name) !== -1 && !meta.type || meta.type === 'date') {
+      if (attributes.indexOf(name) !== -1 && (!meta.type || meta.type === 'date')) {
         fixture[name] = now;
       }
     });
