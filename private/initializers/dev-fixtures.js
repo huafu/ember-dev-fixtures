@@ -203,6 +203,9 @@ function overrideAdapter(name, extension, app) {
   }
   Class = DevFixturesAdapter.extend(extension || {});
   if (Module) {
+    Class.reopenClass({
+      OriginalClass: Module['default']
+    });
     Module['default'] = Class;
   }
   app.register('adapter:' + name, Class);
