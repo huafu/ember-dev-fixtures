@@ -183,7 +183,7 @@ function handleOverlayImport(base, name, dict) {
     overlay = getOverlay(match[1], dict);
     modelName = match[2];
     extendModel(modelName);
-    overlay.fixtures[modelName] = require(name)['default'];
+    overlay.fixtures[modelName] = require(name)['default'].slice();
   }
   return overlay;
 }
@@ -202,7 +202,7 @@ function overrideAdapter(name, extension, app) {
     Module = require(path);
   }
   Class = DevFixturesAdapter.extend(extension || {});
-  if (Module) {
+  if (Module && !Class.OriginalClass) {
     Class.reopenClass({
       OriginalClass: Module['default']
     });
@@ -224,7 +224,7 @@ function extendModel(name) {
   var path = ENV.modulePrefix + '/models/' + name, Class;
   if (require.entries[path] && extendedModels.indexOf(name) === -1) {
     extendedModels.push(name);
-    Class = require(path)['default'];
+    Class = require(path)['default'].extend();
     Class.reopen({
       _devFixtureMeta: DS.attr('raw')
     });
@@ -257,7 +257,7 @@ export function initialize(container, application) {
       else if (!/\//.test(base)) {
         // it is a base fixture
         extendModel(base);
-        BASE_FIXTURES[base] = Ember.A(require(name)['default']);
+        BASE_FIXTURES[base] = Ember.A(require(name)['default'].slice());
         BASE_FIXTURES[base].forEach(fixtureSourceFlagger('fixtures/' + base));
       }
     }

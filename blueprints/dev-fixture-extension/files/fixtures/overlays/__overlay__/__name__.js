@@ -2,7 +2,7 @@
 // exists, or be defined as an addition record.
 //
 // If you need to remove a record from the base fixtures, define it id and then set the special
-// key `__fixtureRemoved` to `true`
+// key `__removeFixture` to `true`
 export default [
   /*{
     id: 1, // all fixtures must have an ID
