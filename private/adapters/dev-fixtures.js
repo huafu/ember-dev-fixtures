@@ -104,7 +104,6 @@ function injectNoConflict(into, fixtures) {
   });
 }
 
-var counter = 1;
 
 /**
  * @class DevFixturesAdapter
@@ -114,6 +113,16 @@ var counter = 1;
  * @property {Object} OVERLAYS
  */
 export default DS.Adapter.extend({
+  /**
+   * Counters for record id generator
+   * @property _generatedCounterId
+   * @type {Object}
+   * @private
+   */
+  _generatedCounterId: computed(function () {
+    return Object.create(null);
+  }),
+
   /**
    * @inheritDoc
    */
@@ -145,7 +154,7 @@ export default DS.Adapter.extend({
    *
    * @method mockJSON
    * @param {DS.Store} store
-   * @param {subclass of DS.Model} type
+   * @param {subclass of DS.Model|string} type
    * @param {DS.Model} record
    * @param {boolean} [addId=false]
    * @return {Object}
@@ -155,7 +164,7 @@ export default DS.Adapter.extend({
     type = this._parseModelOrType(store, type);
     json = record.serialize({includeId: true});
     if (!json.id && addId) {
-      json.id = this.generateIdForRecord(store);
+      json.id = this.generateId(store, type);
     }
     type.eachRelationship(function (key, meta) {
       var records;
@@ -169,13 +178,18 @@ export default DS.Adapter.extend({
   /**
    * Generates an ID for a record
    *
-   * @method generateIdForRecord
+   * @method generateId
    * @param {DS.Store} store
+   * @param {subclass of DS.Model|string} type
    * @param {DS.Model} record
    * @return {String} id
    */
-  generateIdForRecord: function (/*store, record, id*/) {
-    return 'fixture-' + counter++;
+  generateId: function (store, type/*, record*/) {
+    var key = dasherize(this._parseModelOrType(store, type).typeKey), counters = this.get('_generatedCounterId');
+    if (!counters[key]) {
+      counters[key] = 1;
+    }
+    return 'fixture-' + key + '-' + (counters[key]++);
   },
 
   /**
@@ -522,7 +536,7 @@ export default DS.Adapter.extend({
     var fixture = fixtureRecord || {};
     type = this._parseModelOrType(store, type);
     if (!fixtureRecord.id) {
-      fixtureRecord.id = this.generateIdForRecord();
+      fixtureRecord.id = this.generateId(store, type);
     }
     if (this.fixtureForId(store, type, fixture.id)) {
       throw new Error('Fixture `' + type.typeKey + '` with id `' + fixture.id + '` already exists.');
