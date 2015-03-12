@@ -194,14 +194,15 @@ function handleOverlayImport(base, name, dict) {
  * @param {string} name
  * @param {Object} [extension={}]
  * @param {Ember.Application} app
+ * @param {DevFixtureAdapter} BaseAdapter
  * @return {subclass of DevFixturesAdapter}
  */
-function overrideAdapter(name, extension, app) {
+function overrideAdapter(name, extension, app, BaseAdapter) {
   var path = ENV.modulePrefix + '/adapters/' + name, Class, Module;
   if (require.entries[path]) {
     Module = require(path);
   }
-  Class = DevFixturesAdapter.extend(extension || {});
+  Class = (BaseAdapter || DevFixtureAdapter).extend(extension || {});
   if (Module && !Class.OriginalClass) {
     Class.reopenClass({
       OriginalClass: Module['default']
@@ -239,7 +240,7 @@ function extendModel(name) {
  * @param {Ember.Application} application
  */
 export function initialize(container, application) {
-  var adapterNames, regexp, base, adapterOverrides = {}, from,
+  var adapterNames, regexp, base, adapterOverrides = {}, from, BaseAdapter,
     name, BASE_FIXTURES = {}, OVERLAYS = {}, lsKey, currentOverlay;
   regexp = new RegExp('^' + ENV.modulePrefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\/ember\\-dev\\-fixtures\\/');
   for (name in require.entries) {
@@ -305,8 +306,19 @@ export function initialize(container, application) {
       adapterOverrides[name] = {};
     }
   });
+  // we want all to extend the applicaton extension so that users can define globale helpers
+  if (adapterOverrides.application) {
+    base = adapterOverrides.application;
+    delete adapterOverrides.application;
+  }
+  else {
+    base = {};
+  }
+  // we first extend the application one
+  BaseAdapter = overrideAdapter('application', base, application);
+  // and then extend all others based on the application one
   for (name in adapterOverrides) {
-    overrideAdapter(name, adapterOverrides[name], application);
+    overrideAdapter(name, adapterOverrides[name], application, BaseAdapter);
   }
 }
 
