@@ -494,6 +494,23 @@ export default DS.Adapter.extend({
   },
 
   /**
+   * Creates an error response to be used with simulateResponseCall
+   *
+   * @method createErrorResponse
+   * @param {Object|Error|string} errors
+   * @return {Object}
+   */
+  createErrorResponse: function (errors) {
+    if (typeof errors === 'string' || errors instanceof Error) {
+      errors = {'*': '' + errors};
+    }
+    else if (errors == null) {
+      errors = {'*': 'Unnown error'};
+    }
+    return {errors: errors};
+  },
+
+  /**
    * Update the fixture for given type and fixture record
    *
    * @method updateFixtures
