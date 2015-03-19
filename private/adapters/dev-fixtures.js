@@ -328,16 +328,22 @@ export default DS.Adapter.extend({
    * @return {Promise}
    */
   simulateRemoteCall: function (response, statusCode, statusText) {
-    var adapter = this, responseFunction, isOk, shouldCopy;
+    var adapter = this, responseFunction, isOk, shouldCopy, isInvalid;
     statusCode = statusCode || 200;
     statusText = statusText || HTTP_STATUS_MESSAGES[statusCode];
     isOk = Math.round(statusCode / 100) === 2;
-    if (typeof response === 'function' || typeof response === 'string') {
+    if (typeof response === 'function') {
       shouldCopy = true;
       responseFunction = bind(this, response);
     }
     else {
-      response = copy(response, true);
+      isInvalid = response instanceof DS.InvalidError;
+      if (isInvalid) {
+        response = new DS.InvalidError(response.errors);
+      }
+      else {
+        response = copy(response, true);
+      }
       responseFunction = function () {
         return response;
       };
@@ -349,16 +355,16 @@ export default DS.Adapter.extend({
       if (shouldCopy) {
         data = copy(data, true);
       }
-      value = isOk ? data : {
+      value = isOk ? data : (isInvalid ? data : {
         response:     data || {error: statusText},
         responseJSON: data || {error: statusText},
         status:       statusCode,
         statusText:   statusText
-      };
+      });
       Ember.runInDebug(function () {
         console[isOk ? 'log' : 'error'](
           fmt('[dev-fixtures] Simulating %@ response:', isOk ? 'success' : 'error'),
-          copy(value, true)
+          response
         );
       });
       if (adapter.get('simulateRemoteResponse')) {
@@ -505,9 +511,9 @@ export default DS.Adapter.extend({
       errors = {'*': '' + errors};
     }
     else if (errors == null) {
-      errors = {'*': 'Unnown error'};
+      errors = {'*': 'Unknown error'};
     }
-    return {errors: errors};
+    return new DS.InvalidError(errors);
   },
 
   /**

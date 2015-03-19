@@ -202,7 +202,7 @@ function overrideAdapter(name, extension, app, BaseAdapter) {
   if (require.entries[path]) {
     Module = require(path);
   }
-  Class = (BaseAdapter || DevFixtureAdapter).extend(extension || {});
+  Class = (BaseAdapter || DevFixturesAdapter).extend(extension || {});
   if (Module && !Class.OriginalClass) {
     Class.reopenClass({
       OriginalClass: Module['default']
@@ -306,7 +306,7 @@ export function initialize(container, application) {
       adapterOverrides[name] = {};
     }
   });
-  // we want all to extend the applicaton extension so that users can define globale helpers
+  // we want all to extend the application extension so that users can define global helpers
   if (adapterOverrides.application) {
     base = adapterOverrides.application;
     delete adapterOverrides.application;
