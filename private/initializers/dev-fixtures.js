@@ -198,23 +198,24 @@ function handleOverlayImport(base, name, dict) {
  * @return {subclass of DevFixturesAdapter}
  */
 function overrideAdapter(name, extension, app, BaseAdapter) {
-  var path = ENV.modulePrefix + '/adapters/' + name, Class, Module;
+  var path = ENV.modulePrefix + '/adapters/' + name, Module, Class, ModuleClass;
   if (require.entries[path]) {
     Module = require(path);
   }
   Class = (BaseAdapter || DevFixturesAdapter).extend(extension || {});
-  if (Module && !Class.OriginalClass) {
+  ModuleClass = Module ? Module['default'] : null;
+  if (ModuleClass && !(ModuleClass instanceof DevFixturesAdapter)) {
     Class.reopenClass({
-      OriginalClass: Module['default']
+      OriginalClass: ModuleClass
     });
     Module['default'] = Class;
   }
+  //app.__container__.unregister('adapter:' + name);
   app.register('adapter:' + name, Class);
   app.inject('adapter:' + name, 'FIXTURES', 'dev-fixtures:main');
   return Class;
 }
 
-var extendedModels = [];
 /**
  * Extend a model to add the meta attribute
  *
@@ -223,12 +224,14 @@ var extendedModels = [];
  */
 function extendModel(name) {
   var path = ENV.modulePrefix + '/models/' + name, Class;
-  if (require.entries[path] && extendedModels.indexOf(name) === -1) {
-    extendedModels.push(name);
-    Class = require(path)['default'].extend();
-    Class.reopen({
-      _devFixtureMeta: DS.attr('raw')
-    });
+  if (require.entries[path]) {
+    Class = require(path)['default'];
+    if (!Class._devFixturesExtended) {
+      Class.reopen({
+        _devFixtureMeta: DS.attr('raw')
+      });
+      Class.reopenClass({_devFixturesExtended: true});
+    }
   }
   return Class;
 }
