@@ -310,12 +310,12 @@ export function initialize(container, application) {
   if (adapterOverrides.application) {
     base = adapterOverrides.application;
     delete adapterOverrides.application;
+    // we first extend the application one
+    BaseAdapter = overrideAdapter('application', base, application);
   }
   else {
-    base = {};
+    BaseAdapter = DevFixturesAdapter.extend();
   }
-  // we first extend the application one
-  BaseAdapter = overrideAdapter('application', base, application);
   // and then extend all others based on the application one
   for (name in adapterOverrides) {
     overrideAdapter(name, adapterOverrides[name], application, BaseAdapter);
