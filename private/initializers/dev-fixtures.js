@@ -324,6 +324,6 @@ export function initialize(container, application) {
 
 export default {
   name:       'dev-fixtures',
-  before:     'store',
+  before:     'ember-data',
   initialize: initialize
 };
