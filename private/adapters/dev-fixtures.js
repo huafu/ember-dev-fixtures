@@ -108,9 +108,6 @@ function injectNoConflict(into, fixtures) {
 /**
  * @class DevFixturesAdapter
  * @extends DS.Adapter
- *
- * @property {Object} FIXTURES
- * @property {Object} OVERLAYS
  */
 export default DS.Adapter.extend({
   /**
@@ -120,8 +117,18 @@ export default DS.Adapter.extend({
    * @private
    */
   _generatedCounterId: computed(function () {
-    return Object.create(null);
+    return this.container.lookup('dev-fixtures:counters');
   }),
+
+  /**
+   * The fixtures
+   * @property FIXTURES
+   * @type {Object.<Ember.Array.<{}>>}
+   */
+  FIXTURES: computed(function () {
+    return this.container.lookup('dev-fixtures:main');
+  }),
+
 
   /**
    * @inheritDoc
@@ -185,7 +192,9 @@ export default DS.Adapter.extend({
    * @return {String} id
    */
   generateId: function (store, type/*, record*/) {
-    var key = dasherize(this._parseModelOrType(store, type).typeKey), counters = this.get('_generatedCounterId');
+    var key, counters;
+    key = dasherize(this._parseModelOrType(store, type).typeKey);
+    counters = this.get('_generatedCounterId');
     if (!counters[key]) {
       counters[key] = 1;
     }
@@ -292,13 +301,14 @@ export default DS.Adapter.extend({
    * @inheritDoc
    */
   fixturesForType: function (store, type) {
-    var key;
+    var key, FIXTURES;
     type = this._parseModelOrType(store, type);
     key = dasherize(type.typeKey);
-    if (!this.FIXTURES[key]) {
-      this.FIXTURES[key] = Ember.A([]);
+    FIXTURES = this.get('FIXTURES');
+    if (!FIXTURES[key]) {
+      FIXTURES[key] = Ember.A([]);
     }
-    return this.FIXTURES[key];
+    return FIXTURES[key];
   },
 
   /**
