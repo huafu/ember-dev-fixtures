@@ -374,7 +374,7 @@ export default DS.Adapter.extend({
       Ember.runInDebug(function () {
         console[isOk ? 'log' : 'error'](
           fmt('[dev-fixtures] Simulating %@ response:', isOk ? 'success' : 'error'),
-          response
+          copy(response, true)
         );
       });
       if (adapter.get('simulateRemoteResponse')) {
